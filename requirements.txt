@@ -1,4 +1,4 @@
-# requirements.txt (Final, Hardened for Deployment)
+# requirements.txt (Final, Corrected for Deployment)
 
 # --- Core Frameworks ---
 streamlit>=1.33.0
@@ -10,9 +10,9 @@ langchain-community>=0.0.34
 langchain-google-genai>=1.0.1
 google-generativeai>=0.4.1
 
-# --- Core Scientific & ML Libraries (Specify versions to ensure compatibility) ---
-numpy==1.26.4
-scikit-learn==1.4.2
+# --- Core Scientific & ML Libraries (No version pins for better cross-platform compatibility) ---
+numpy
+scikit-learn
 sentence-transformers>=2.2.2
 
 # --- Data Sources & Processing ---
@@ -27,7 +27,7 @@ python-arango>=7.8.0
 langchain-arangodb>=0.1.0
 
 # --- Web Search & Visualization ---
-langchain-community>=0.0.34 # Already included, but for clarity
+# langchain-community is already listed above
 streamlit-agraph>=0.0.38
 
 # --- Utilities ---

@@ -1,20 +1,14 @@
 ---
-title: Ai Research Partner
-emoji: 🚀
-colorFrom: red
-colorTo: red
-sdk: docker
-app_port: 8501
-tags:
-- streamlit
-pinned: false
-short_description: 'Multi-Source Conversational Agent '
-license: mit
+title: AI Research Partner
+emoji: 🧠
+colorFrom: indigo
+colorTo: blue
+sdk: streamlit
+python_version: "3.10"
+app_file: app.py
 ---
 
-# Welcome to Streamlit!
+## 🧠 AI Research Partner
 
-Edit `/src/streamlit_app.py` to customize this app to your heart's desire. :heart:
-
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
+This is a multi-source, conversational agent with a hybrid knowledge graph and live web search.
+Developed by SALMA S.
