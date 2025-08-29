@@ -1,4 +1,4 @@
-# requirements.txt (Final, Corrected for Deployment)
+# requirements.txt (Final for Neo4j Deployment)
 
 # --- Core Frameworks ---
 streamlit>=1.33.0
@@ -9,8 +9,6 @@ langchain-community>=0.0.34
 # --- LLM & Embeddings ---
 langchain-google-genai>=1.0.1
 google-generativeai>=0.4.1
-
-# --- Core Scientific & ML Libraries (No version pins for better cross-platform compatibility) ---
 numpy
 scikit-learn
 sentence-transformers>=2.2.2
@@ -22,12 +20,12 @@ beautifulsoup4>=4.12.3
 # --- Databases (Vector & Graph) ---
 faiss-cpu>=1.7.4
 
-# --- ArangoDB Packages ---
-python-arango>=7.8.0
-langchain-arangodb>=0.1.0
+# --- NEW: Neo4j Packages ---
+neo4j>=5.18.0
+langchain-neo4j>=0.0.5
 
 # --- Web Search & Visualization ---
-# langchain-community is already listed above
+langchain-community>=0.0.34
 streamlit-agraph>=0.0.38
 
 # --- Utilities ---

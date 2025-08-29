@@ -2,9 +2,10 @@
 
 import streamlit as st
 from config import get_llm, get_embeddings_model
-from data_processing import process_uploaded_pdf # Simplified import
+from data_processing import process_uploaded_pdf, process_url
 from vector_store import create_faiss_vector_store
-from graph_db import get_arangodb_graph, populate_graph_from_docs, get_graph_qa_chain
+# Import the correct Neo4j functions from graph_db
+from graph_db import get_neo4j_graph, populate_graph_from_docs, get_graph_qa_chain
 from qa_chain import generate_response
 from visualization import visualize_graph_from_query
 from google.api_core.exceptions import ResourceExhausted
@@ -15,7 +16,8 @@ st.title("🧠 AI Research Partner")
 # --- Initialize Models and Connections ---
 llm = get_llm()
 embeddings = get_embeddings_model()
-graph = get_arangodb_graph()
+# Initialize the Neo4j graph connection
+graph = get_neo4j_graph()
 
 # --- Session State Management ---
 if "docs" not in st.session_state:
@@ -29,30 +31,42 @@ if "processed_sources" not in st.session_state:
 
 # --- UI: Sidebar for Data Ingestion ---
 with st.sidebar:
-    st.header("1. Upload Documents")
+    st.header("1. Add Data Sources")
     
-    # PDF Uploader is now the only input method
     uploaded_files = st.file_uploader(
         "Upload PDF documents",
         type="pdf",
         accept_multiple_files=True
     )
+    url_input = st.text_input("Or enter a website URL")
 
-    if st.button("Process Documents"):
-        if not uploaded_files:
-            st.warning("Please upload at least one PDF.")
+    if st.button("Process Sources"):
+        if not uploaded_files and not url_input:
+            st.warning("Please upload a PDF or enter a URL.")
         else:
             new_docs = []
             with st.spinner("Processing documents... This may take a few minutes."):
                 try:
-                    for file in uploaded_files:
-                        if file.name not in st.session_state.processed_sources:
-                            st.info(f"Processing PDF: {file.name}")
-                            pdf_docs = process_uploaded_pdf(file)
-                            if pdf_docs: # Ensure docs were processed
+                    # Clear the entire Neo4j database before processing new files
+                    st.info("Clearing old graph data...")
+                    graph.query("MATCH (n) DETACH DELETE n")
+
+                    if uploaded_files:
+                        for file in uploaded_files:
+                            if file.name not in st.session_state.processed_sources:
+                                st.info(f"Processing PDF: {file.name}")
+                                pdf_docs = process_uploaded_pdf(file)
                                 populate_graph_from_docs(graph, pdf_docs, llm, file.name)
                                 new_docs.extend(pdf_docs)
                                 st.session_state.processed_sources.add(file.name)
+                    
+                    if url_input and url_input not in st.session_state.processed_sources:
+                        st.info(f"Processing URL: {url_input}")
+                        url_docs = process_url(url_input)
+                        populate_graph_from_docs(graph, url_docs, llm, url_input)
+                        new_docs.extend(url_docs)
+                        st.session_state.processed_sources.add(url_input)
+
                 except ResourceExhausted:
                     st.error("API Quota Reached during processing. Please try again tomorrow.")
                 except Exception as e:
@@ -66,9 +80,9 @@ with st.sidebar:
             else:
                 st.info("No new documents to process.")
 
-    st.header("Processed Documents")
-    st.markdown(f"**{len(st.session_state.processed_sources)}** documents loaded.")
-    with st.expander("View Documents"):
+    st.header("Processed Sources")
+    st.markdown(f"**{len(st.session_state.processed_sources)}** sources loaded.")
+    with st.expander("View Sources"):
         for source in st.session_state.processed_sources:
             st.write(f"- {source}")
 
@@ -79,7 +93,6 @@ st.header("2. Ask Your Research Question")
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         if isinstance(message["content"], dict):
-            # Re-display the tabbed output from history
             tab_list = [
                 "✅ Main Answer", " perspectives", "🔬 Analytical Insights", 
                 "💡 Creative Insights", "🔎 Recommendations", "📚 Sources & Details"
@@ -133,9 +146,12 @@ if prompt := st.chat_input("Ask a question about your documents..."):
                         st.subheader("Document Sources (from Vector Search)")
                         st.text_area("Semantic Context", result["semantic_sources"], height=200)
                         st.subheader("Knowledge Graph Context")
-                        st.code(result["graph_source"], language="sql")
+                        st.code(result["graph_source"], language="sql") # Displaying the Cypher query result
                         st.subheader("Visual Knowledge Map")
-                        visualize_graph_from_query(graph, result["graph_source"])
+                        # Note: Visualization may not work as well with the Cypher chain's text output.
+                        # This is a known area for future improvement.
+                        st.warning("Visualization is experimental and may not render for all queries.")
+                        # visualize_graph_from_query(graph, result["graph_source"]) # Commented out for stability
 
                     st.session_state.messages.append({"role": "assistant", "content": result})
 
