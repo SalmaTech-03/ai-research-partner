@@ -1,97 +1,132 @@
 # graph_db.py
 
-from arango import ArangoClient
-from langchain_arangodb import ArangoGraph, ArangoGraphQAChain
+from langchain_neo4j import Neo4jGraph
+from langchain.chains import GraphCypherQAChain
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from schemas import TripletList
-from config import ARANGO_HOST, ARANGO_DATABASE, ARANGO_USER, ARANGO_PASSWORD
+from config import NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 import streamlit as st
-import re
+
 
 @st.cache_resource
-def get_arangodb_graph():
-    """Initializes and returns the ArangoDB graph object."""
-    client = ArangoClient(hosts=ARANGO_HOST)
-    db = client.db(ARANGO_DATABASE, username=ARANGO_USER, password=ARANGO_PASSWORD)
-    return ArangoGraph(db)
+def get_neo4j_graph():
+    """
+    Initialize and return the Neo4j graph connection.
+    """
+    return Neo4jGraph(
+        url=NEO4J_URI,
+        username=NEO4J_USERNAME,
+        password=NEO4J_PASSWORD,
+    )
 
-def sanitize_for_key(text):
-    """Sanitizes a string to be a valid ArangoDB _key."""
-    sanitized = re.sub(r'[^a-zA-Z0-9_:.@-]', '_', text)
-    return sanitized if sanitized else "empty"
+
+def format_relationship(relation: str) -> str:
+    """
+    Convert relationship names into valid Neo4j relationship types.
+    Example:
+        "works at" -> WORKS_AT
+    """
+    return (
+        relation.upper()
+        .replace(" ", "_")
+        .replace("-", "_")
+        .replace("/", "_")
+    )
+
 
 def populate_graph_from_docs(graph, docs, llm, source_name: str):
     """
-    Extracts entities and relationships and populates the ArangoDB graph.
+    Extract entities and relationships from documents and populate Neo4j.
     """
-    if not graph.db.has_graph("knowledge_graph"):
-        st.info("Creating new graph 'knowledge_graph'...")
-        graph.db.create_graph(
-            "knowledge_graph",
-            edge_definitions=[{
-                "edge_collection": "Relationships",
-                "from_vertex_collections": ["Entities"],
-                "to_vertex_collections": ["Entities"],
-            }]
-        )
+
+    graph.query(
+        """
+        CREATE INDEX IF NOT EXISTS
+        FOR (n:Entity)
+        ON (n.id)
+        """
+    )
 
     extraction_prompt = PromptTemplate.from_template(
         """
-        You are an expert data analyst... (Prompt is the same as before)
-        TEXT:
-        {chunk}
-        """
+You are an expert knowledge graph extraction system.
+
+Extract entities and relationships from the following text.
+
+Return ONLY valid JSON matching the required schema.
+
+TEXT:
+{chunk}
+"""
     )
-    
+
     extraction_chain = extraction_prompt | llm | JsonOutputParser()
-    
-    st.write(f"Extracting knowledge from '{source_name}' and populating graph...")
+
+    st.info(f"Building knowledge graph from '{source_name}'...")
     progress_bar = st.progress(0)
-    
+
+    total_docs = len(docs)
+
     for i, doc in enumerate(docs):
+
         try:
-            extracted_json = extraction_chain.invoke({"chunk": doc.page_content})
+
+            extracted_json = extraction_chain.invoke(
+                {"chunk": doc.page_content}
+            )
+
             validated_triplets = TripletList.parse_obj(extracted_json)
-            
+
             for triplet in validated_triplets.triplets:
-                aql_query = """
-                LET head_key = @head_key
-                LET tail_key = @tail_key
-                
-                UPSERT { _key: head_key } INSERT { _key: head_key, id: @head, source: @source } UPDATE { source: @source } IN Entities
-                UPSERT { _key: tail_key } INSERT { _key: tail_key, id: @tail, source: @source } UPDATE { source: @source } IN Entities
-                UPSERT { _from: @from, _to: @to, label: @label } INSERT { _from: @from, _to: @to, label: @label, source: @source } UPDATE { source: @source } IN Relationships
+
+                relation = format_relationship(triplet.relation)
+
+                query = f"""
+                MERGE (h:Entity {{id:$head}})
+                ON CREATE SET
+                    h.source=$source
+
+                MERGE (t:Entity {{id:$tail}})
+                ON CREATE SET
+                    t.source=$source
+
+                MERGE (h)-[r:`{relation}`]->(t)
+                ON CREATE SET
+                    r.source=$source
                 """
-                
-                # --- THIS IS THE FINAL, CORRECTED FUNCTION CALL ---
-                # LangChain's wrapper expects parameters as direct keyword arguments.
+
                 graph.query(
-                    aql_query,
-                    head=triplet.head,
-                    tail=triplet.tail,
-                    label=triplet.relation,
-                    source=source_name,
-                    head_key=sanitize_for_key(triplet.head),
-                    tail_key=sanitize_for_key(triplet.tail),
-                    from_="Entities/" + sanitize_for_key(triplet.head), # Use from_ to avoid Python keyword conflict
-                    to="Entities/" + sanitize_for_key(triplet.tail),
+                    query,
+                    params={
+                        "head": triplet.head,
+                        "tail": triplet.tail,
+                        "source": source_name,
+                    },
                 )
 
-            progress_bar.progress((i + 1) / len(docs), text=f"Processing chunk {i+1}/{len(docs)}")
-        
+            progress_bar.progress(
+                (i + 1) / total_docs,
+                text=f"Processing chunk {i+1}/{total_docs}",
+            )
+
         except Exception as e:
-            st.error(f"Failed to process chunk {i+1}. Error: {e}")
+            st.error(f"Failed to process chunk {i+1}: {e}")
             continue
-            
-    st.success(f"Knowledge from '{source_name}' has been added to the graph!")
+
+    st.success("Knowledge graph created successfully.")
+
 
 def get_graph_qa_chain(graph, llm):
-    """Creates and returns a question-answering chain for the ArangoDB graph."""
-    return ArangoGraphQAChain.from_llm(
-        llm=llm,
+    """
+    Create the Cypher QA chain.
+    """
+
+    graph.refresh_schema()
+
+    return GraphCypherQAChain.from_llm(
         graph=graph,
-        graph_name="knowledge_graph",
+        llm=llm,
         verbose=True,
-        allow_dangerous_requests=True
+        allow_dangerous_requests=True,
     )
