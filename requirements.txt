@@ -1,33 +1,78 @@
-# requirements.txt (Final for Neo4j Deployment)
 
-# --- Core Frameworks ---
-streamlit>=1.33.0
-langchain>=0.1.16
-langchain-core>=0.1.45
-langchain-community>=0.0.34
 
-# --- LLM & Embeddings ---
-langchain-google-genai>=1.0.1
-google-generativeai>=0.4.1
-numpy
-scikit-learn
-sentence-transformers>=2.2.2
+# Streamlit
 
-# --- Data Sources & Processing ---
-pypdf>=4.0.0
+streamlit>=1.36.0
+
+
+# LangChain Core
+
+langchain>=0.3.7
+langchain-core>=0.3.18
+langchain-community>=0.3.7
+langchain-text-splitters>=0.3.2
+
+
+# Google Gemini
+
+langchain-google-genai>=2.0.5
+google-generativeai>=0.8.3
+
+
+# Embeddings
+
+sentence-transformers>=3.2.1
+transformers>=4.46.0
+torch>=2.4.0
+
+
+# Vector Database
+
+faiss-cpu>=1.9.0
+
+
+# Neo4j
+
+neo4j>=5.26.0
+langchain-neo4j>=0.2.0
+
+
+# PDF Processing
+
+pypdf>=5.0.1
+
+
+# Web Processing
+
 beautifulsoup4>=4.12.3
+lxml>=5.3.0
+requests>=2.32.3
 
-# --- Databases (Vector & Graph) ---
-faiss-cpu>=1.7.4
 
-# --- NEW: Neo4j Packages ---
-neo4j>=5.18.0
-langchain-neo4j>=0.0.5
+# Google Search
 
-# --- Web Search & Visualization ---
-langchain-community>=0.0.34
-streamlit-agraph>=0.0.38
+google-api-python-client>=2.151.0
 
-# --- Utilities ---
-pydantic>=2.0.0
-python-dotenv>=1.0.0
+
+# Visualization
+
+streamlit-agraph>=0.0.45
+networkx>=3.4.2
+
+
+# Data Models
+
+pydantic>=2.9.2
+
+# Utilities
+
+python-dotenv>=1.0.1
+typing_extensions>=4.12.2
+tqdm>=4.67.0
+
+
+# Numerical Libraries
+
+numpy>=1.26.4
+scikit-learn>=1.5.2
+
