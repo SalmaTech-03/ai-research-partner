@@ -1,44 +1,119 @@
 # data_processing.py
 
-from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-import tempfile
+"""
+Document processing utilities.
+
+Responsibilities
+----------------
+1. Load PDF documents
+2. Split documents into semantic chunks
+3. Preserve metadata
+4. Clean temporary files
+5. Prepare documents for FAISS and Neo4j
+"""
+
+from __future__ import annotations
+
+import logging
 import os
+import tempfile
+from typing import List
 
-def process_uploaded_pdf(uploaded_file):
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.schema import Document
+from langchain_community.document_loaders import PyPDFLoader
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------
+# Chunking Configuration
+# ---------------------------------------------------------------------
+
+CHUNK_SIZE = 1200
+CHUNK_OVERLAP = 200
+
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=CHUNK_SIZE,
+    chunk_overlap=CHUNK_OVERLAP,
+    separators=[
+        "\n\n",
+        "\n",
+        ". ",
+        " ",
+        ""
+    ],
+)
+
+# ---------------------------------------------------------------------
+# PDF Processing
+# ---------------------------------------------------------------------
+
+def process_uploaded_pdf(uploaded_file) -> List[Document]:
     """
-    Loads a PDF, splits it into chunks, and returns the document chunks.
-    Handles temporary file creation and cleanup.
+    Load an uploaded PDF and split it into chunks.
     """
+
     if uploaded_file is None:
-        return None
-        
-    # Create a temporary file to store the uploaded PDF to ensure compatibility
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-        tmp_file.write(uploaded_file.getvalue())
-        tmp_file_path = tmp_file.name
+        return []
 
-    docs = None
+    logger.info("Processing PDF: %s", uploaded_file.name)
+
+    temp_path = None
+
     try:
-        # Load the document from the temporary file path
-        loader = PyPDFLoader(tmp_file_path)
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".pdf"
+        ) as temp_file:
+
+            temp_file.write(uploaded_file.getvalue())
+            temp_path = temp_file.name
+
+        loader = PyPDFLoader(temp_path)
+
         documents = loader.load()
 
-        # Split the document into smaller, more manageable chunks
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, 
-            chunk_overlap=150
+        for page in documents:
+            page.metadata["source"] = uploaded_file.name
+
+        chunks = text_splitter.split_documents(documents)
+
+        logger.info(
+            "Generated %d chunks from %s",
+            len(chunks),
+            uploaded_file.name,
         )
-        docs = text_splitter.split_documents(documents)
-        
-    except Exception as e:
-        print(f"Error processing PDF file: {e}")
-        # We can also add a Streamlit error message here if needed,
-        # but for now, we'll just return None.
-        return None
+
+        return chunks
+
+    except Exception:
+        logger.exception("Failed to process PDF.")
+        return []
+
     finally:
-        # Clean up the temporary file after processing is complete
-        if os.path.exists(tmp_file_path):
-            os.remove(tmp_file_path)
-    
-    return docs
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                logger.warning("Unable to remove temporary file.")
+
+# ---------------------------------------------------------------------
+# Future Extensions
+# ---------------------------------------------------------------------
+
+def process_url(url: str):
+    """
+    Placeholder for website ingestion.
+
+    Replace this later with:
+    - WebBaseLoader
+    - FireCrawl
+    - Jina Reader
+    - Crawl4AI
+
+    depending on your preferred crawler.
+    """
+
+    raise NotImplementedError(
+        "URL processing has not yet been implemented."
+    )
