@@ -1,16 +1,74 @@
 # schemas.py
 
-from pydantic import BaseModel, Field
-from typing import List, Tuple
+"""
+Pydantic schemas used throughout the AI Research Partner.
 
-# Pydantic model for a single graph triplet
+Responsibilities
+----------------
+1. Validate extracted knowledge graph triplets
+2. Ensure clean entity names
+3. Prevent malformed LLM outputs
+4. Maintain compatibility with Pydantic v2
+"""
+
+from __future__ import annotations
+
+from typing import List
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
 class GraphTriplet(BaseModel):
-    """A single triplet representing a relationship in the knowledge graph."""
-    head: str = Field(..., description="The subject or head entity of the triplet.")
-    relation: str = Field(..., description="The relationship connecting the head and tail entities.")
-    tail: str = Field(..., description="The object or tail entity of the triplet.")
+    """
+    Represents a single knowledge graph triplet.
+    """
 
-# Pydantic model for the list of triplets
+    model_config = ConfigDict(
+        extra="ignore",
+        str_strip_whitespace=True,
+    )
+
+    head: str = Field(
+        ...,
+        min_length=1,
+        description="Head (subject) entity."
+    )
+
+    relation: str = Field(
+        ...,
+        min_length=1,
+        description="Relationship between entities."
+    )
+
+    tail: str = Field(
+        ...,
+        min_length=1,
+        description="Tail (object) entity."
+    )
+
+    @field_validator("head", "relation", "tail")
+    @classmethod
+    def clean_text(cls, value: str) -> str:
+        """
+        Normalize whitespace and remove line breaks.
+        """
+        return (
+            value.replace("\n", " ")
+                 .replace("\r", " ")
+                 .strip()
+        )
+
+
 class TripletList(BaseModel):
-    """A list of triplets extracted from a text chunk."""
-    triplets: List[GraphTriplet]
+    """
+    Collection of extracted triplets.
+    """
+
+    model_config = ConfigDict(
+        extra="ignore"
+    )
+
+    triplets: List[GraphTriplet] = Field(
+        default_factory=list,
+        description="List of extracted graph triplets."
+    )
