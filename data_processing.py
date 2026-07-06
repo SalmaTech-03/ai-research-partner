@@ -1,119 +1,36 @@
-# data_processing.py
-
-"""
-Document processing utilities.
-
-Responsibilities
-----------------
-1. Load PDF documents
-2. Split documents into semantic chunks
-3. Preserve metadata
-4. Clean temporary files
-5. Prepare documents for FAISS and Neo4j
-"""
-
-from __future__ import annotations
-
-import logging
-import os
-import tempfile
+import hashlib, tempfile, os, logging
 from typing import List
-
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
-from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------
-# Chunking Configuration
-# ---------------------------------------------------------------------
+def get_namespace(file_bytes: bytes) -> str:
+    """Full SHA-256 for idempotent multi-tenancy."""
+    return hashlib.sha256(file_bytes).hexdigest()
 
-CHUNK_SIZE = 1200
-CHUNK_OVERLAP = 200
+def get_chunk_hash(content: str, version: str = "v1") -> str:
+    return hashlib.sha256(f"{version}:{content}".encode()).hexdigest()
 
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=CHUNK_SIZE,
-    chunk_overlap=CHUNK_OVERLAP,
-    separators=[
-        "\n\n",
-        "\n",
-        ". ",
-        " ",
-        ""
-    ],
-)
-
-# ---------------------------------------------------------------------
-# PDF Processing
-# ---------------------------------------------------------------------
-
-def process_uploaded_pdf(uploaded_file) -> List[Document]:
-    """
-    Load an uploaded PDF and split it into chunks.
-    """
-
-    if uploaded_file is None:
-        return []
-
-    logger.info("Processing PDF: %s", uploaded_file.name)
-
-    temp_path = None
-
+def process_pdf(uploaded_file) -> List[Document]:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        tmp.write(uploaded_file.getvalue())
+        path = tmp.name
     try:
-        with tempfile.NamedTemporaryFile(
-            delete=False,
-            suffix=".pdf"
-        ) as temp_file:
-
-            temp_file.write(uploaded_file.getvalue())
-            temp_path = temp_file.name
-
-        loader = PyPDFLoader(temp_path)
-
-        documents = loader.load()
-
-        for page in documents:
-            page.metadata["source"] = uploaded_file.name
-
-        chunks = text_splitter.split_documents(documents)
-
-        logger.info(
-            "Generated %d chunks from %s",
-            len(chunks),
-            uploaded_file.name,
-        )
-
+        loader = PyPDFLoader(path)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+        chunks = splitter.split_documents(loader.load())
+        for d in chunks: d.metadata["source"] = uploaded_file.name
         return chunks
-
-    except Exception:
-        logger.exception("Failed to process PDF.")
-        return []
-
     finally:
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception:
-                logger.warning("Unable to remove temporary file.")
+        if os.path.exists(path): os.remove(path)
 
-# ---------------------------------------------------------------------
-# Future Extensions
-# ---------------------------------------------------------------------
-
-def process_url(url: str):
-    """
-    Placeholder for website ingestion.
-
-    Replace this later with:
-    - WebBaseLoader
-    - FireCrawl
-    - Jina Reader
-    - Crawl4AI
-
-    depending on your preferred crawler.
-    """
-
-    raise NotImplementedError(
-        "URL processing has not yet been implemented."
-    )
+def process_url(url: str) -> List[Document]:
+    try:
+        loader = WebBaseLoader(url)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+        return splitter.split_documents(loader.load())
+    except Exception as e:
+        logger.error(f"Scrape Failed: {e}")
+        return []
