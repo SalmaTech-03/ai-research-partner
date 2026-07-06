@@ -4,7 +4,7 @@
 [![Neo4j 5.x](https://img.shields.io/badge/Neo4j-5.x-green.svg)](https://neo4j.com/)
 [![LangChain](https://img.shields.io/badge/Orchestration-LangChain-white.svg)](https://python.langchain.com/)
 [![FAISS](https://img.shields.io/badge/Vector%20Search-FAISS-orange.svg)](https://github.com/facebookresearch/faiss)
-[![Gemini 1.5 Flash](https://img.shields.io/badge/LLM-Gemini%201.5%20Flash-blueviolet.svg)](https://ai.google.dev/)
+[![Gemini 1.5 Flash](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-blueviolet.svg)](https://ai.google.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An AI-driven research assistant implementing a **Hybrid GraphRAG** architecture. The system combines structured knowledge graph traversal, semantic vector retrieval, and neural reranking to analyze technical documents with high contextual precision.
