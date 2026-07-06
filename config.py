@@ -15,7 +15,8 @@ settings = Settings()
 
 @st.cache_resource
 def get_llm():
-    return ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, google_api_key=settings.google_api_key)
+    return ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, google_api_key=settings.google_api_key)
+    
 
 @st.cache_resource
 def get_embeddings():
